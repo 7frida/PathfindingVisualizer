@@ -1,10 +1,11 @@
 
 #include <SFML/Graphics.hpp>
 #include <vector>
-#include <queue> //FIFO
+#include <queue>
 #include <iostream>
+#include <algorithm>
 
-// Grid configuration
+// Grid settings
 const int ROWS = 20;
 const int COLS = 30;
 const int CELL_SIZE = 28;
@@ -20,67 +21,84 @@ const int START_ROW = 0;
 const int START_COL = 0;
 
 const int GOAL_ROW = ROWS - 1;
-const int GOAL_COL = COLS - 1; //C++ indexing starts at 0
+const int GOAL_COL = COLS - 1;
 
-// Cell data
+// Cell structure
 struct Cell {
     bool isWall = false;
     bool visited = false;
     bool isPath = false;
 };
 
-// Grid contains 20 x 30 = 600 cells
+// Grid stored as a 1D vector
 std::vector<Cell> grid(ROWS * COLS);
 
-// Convert row and column into a single index 
-//- Instead of storing the grid as a two-dimensional array, we're storing it in a one-dimensional vector
-// simple storage, easy iteration,
+// Convert 2D coordinates to 1D index
 int indexOf(int row, int col) {
     return row * COLS + col;
 }
 
-// Draw the entire grid
+// BFS state
+std::queue<int> frontier; // next cell
+std::vector<int> parent(ROWS * COLS, -1); // predecessor
+// std::vector<int> vectorName(numberOfElements, initialValue);
+// memory structure that remembers how BFS reached every cell, allowing to recover the shortest route after the search finishes
+std::vector<int> path;
+
+bool isSearching = false;
+bool isAnimatingPath = false;
+bool pathFound = false;
+
+int pathIndex = 0;
+
+// Draw the grid
 void drawGrid(sf::RenderWindow& window) {
-    sf::RectangleShape rectangle(
-        sf::Vector2f(
-            CELL_SIZE - 2.f,
-            CELL_SIZE - 2.f
-        )
-    );
 
     for (int row = 0; row < ROWS; row++) {
         for (int col = 0; col < COLS; col++) {
 
             int index = indexOf(row, col);
 
-            // Position of this cell
-            rectangle.setPosition({
+            sf::RectangleShape cell(
+                sf::Vector2f(CELL_SIZE - 1, CELL_SIZE - 1)
+            );
+
+            cell.setPosition(sf::Vector2f(
                 OFFSET_X + col * CELL_SIZE,
                 OFFSET_Y + row * CELL_SIZE
-            });
+            ));
 
-            // Choose cell colour
+            // Start cell
             if (row == START_ROW && col == START_COL) {
-                rectangle.setFillColor(sf::Color(50, 200, 100)); // Green
+                cell.setFillColor(sf::Color(50, 200, 100));
             }
+
+            // Goal cell
             else if (row == GOAL_ROW && col == GOAL_COL) {
-                rectangle.setFillColor(sf::Color(230, 70, 70)); // Red
+                cell.setFillColor(sf::Color(230, 70, 70));
             }
+
+            // Wall
             else if (grid[index].isWall) {
-                rectangle.setFillColor(sf::Color(35, 40, 50)); // Wall
+                cell.setFillColor(sf::Color(35, 40, 50));
             }
+
+            // Shortest path
             else if (grid[index].isPath) {
-                rectangle.setFillColor(sf::Color(255, 220, 50)); //Yellow - shortest path
+                cell.setFillColor(sf::Color(255, 220, 50));
             }
+
+            // Visited cell
             else if (grid[index].visited) {
-                rectangle.setFillColor(sf::Color(100, 180, 230)); //B lue
+                cell.setFillColor(sf::Color(100, 180, 230));
             }
+
+            // Empty cell
             else {
-                rectangle.setFillColor(sf::Color(100, 110, 130)); // Empty
+                cell.setFillColor(sf::Color(100, 110, 130));
             }
 
-
-            window.draw(rectangle);
+            window.draw(cell);
         }
     }
 }
@@ -88,36 +106,31 @@ void drawGrid(sf::RenderWindow& window) {
 // Breadth-First Search
 bool findPath() {
 
-    // Clear previous search results
-    for (auto& cell : grid) {
+    // Reset previous search results
+    for (Cell& cell : grid) {
         cell.visited = false;
         cell.isPath = false;
     }
 
-    // Store the parent of each cell
     std::vector<int> parent(ROWS * COLS, -1);
-
-    // Create BFS queue
     std::queue<int> frontier;
 
-    // Start and Goal indices
     int start = indexOf(START_ROW, START_COL);
     int goal = indexOf(GOAL_ROW, GOAL_COL);
 
-    // Begin BFS
     grid[start].visited = true;
     frontier.push(start);
 
-    // Four possible movement directions
+    // Four movement directions
     int dr[] = {-1, 1, 0, 0};
     int dc[] = {0, 0, -1, 1};
 
+    // BFS exploration
     while (!frontier.empty()) {
 
         int current = frontier.front();
         frontier.pop();
 
-        // Have we reached the Goal?
         if (current == goal) {
             break;
         }
@@ -125,13 +138,12 @@ bool findPath() {
         int row = current / COLS;
         int col = current % COLS;
 
-        // Explore neighbours
-        for (int i = 0; i < 4; i++) {
+        for (int direction = 0; direction < 4; direction++) {
 
-            int newRow = row + dr[i];
-            int newCol = col + dc[i];
+            int newRow = row + dr[direction];
+            int newCol = col + dc[direction];
 
-            // Check boundaries
+            // Check grid boundaries
             if (newRow < 0 || newRow >= ROWS ||
                 newCol < 0 || newCol >= COLS) {
                 continue;
@@ -145,13 +157,8 @@ bool findPath() {
                 continue;
             }
 
-            // Mark neighbour as visited
             grid[neighbour].visited = true;
-
-            // Remember where we came from when trace backwards - reconstruct the shortest path
             parent[neighbour] = current;
-
-            // Add neighbour to queue
             frontier.push(neighbour);
         }
     }
@@ -161,18 +168,164 @@ bool findPath() {
         return false;
     }
 
-    // Reconstruct path from Goal to Start
+    // Reconstruct shortest path
     int current = goal;
 
     while (current != start) {
-
         grid[current].isPath = true;
-
         current = parent[current];
     }
 
     return true;
 }
+
+void reconstructPath() {
+
+    int start = indexOf(START_ROW, START_COL);
+    int goal = indexOf(GOAL_ROW, GOAL_COL);
+
+    // Start from the Goal
+    int current = goal;
+
+    // Follow parent pointers backwards
+    while (current != start) {
+
+        path.push_back(current);
+
+        current = parent[current]; //find the parent index untill reach Start
+    }
+
+    // Include the Start cell
+    path.push_back(start);
+
+    // Reverse the vector path to get Start -> Goal
+    std::reverse(path.begin(), path.end());
+
+    // Prepare the path animation
+    pathIndex = 0;
+    isAnimatingPath = true;
+}
+
+
+void updatePathAnimation() {
+
+    // Stop when every path cell has been animated
+    if (pathIndex >= static_cast<int>(path.size())) { //convert type to int - check size
+        isAnimatingPath = false;
+        return;
+    }
+
+    // Get the next cell in the shortest path
+    int current = path[pathIndex];
+
+    // Mark it as part of the path
+    grid[current].isPath = true;
+
+    // Move to the next path cell
+    pathIndex++;
+}
+
+
+void startBFS() {
+
+    // Reset previous search results
+    for (Cell& cell : grid) { // & means reference
+        cell.visited = false;
+        cell.isPath = false;
+    }
+
+    // Reset BFS data - parent needs to be cleared every time we start a new BFS
+    frontier = std::queue<int>();
+    parent.assign(ROWS * COLS, -1); // set to -1
+    path.clear();
+
+    isSearching = true;
+    isAnimatingPath = false;
+    pathFound = false;
+    pathIndex = 0;
+
+    // Initialise Start cell
+    int start = indexOf(START_ROW, START_COL);
+    grid[start].visited = true;
+
+    frontier.push(start);
+}
+
+
+void updateBFS() {
+
+    // Stop if BFS is not running
+    if (!isSearching) {
+        return;
+    }
+
+    // Check whether there are any cells left to explore
+    if (frontier.empty()) {
+        isSearching = false;
+        pathFound = false;
+        std::cout << "No path found!" << std::endl;
+        return;
+    }
+
+    // Get the next cell from the queue
+    int current = frontier.front();
+    frontier.pop();
+
+    // Check whether we have reached the Goal
+    int goal = indexOf(GOAL_ROW, GOAL_COL);
+
+    if (current == goal) {
+
+        isSearching = false;
+        pathFound = true;
+
+        reconstructPath(); // shortest path
+
+        std::cout << "Goal reached!" << std::endl;
+        return;
+    }
+
+    // Convert the current index into row and column
+    int row = current / COLS;
+    int col = current % COLS;
+
+    // Four possible movement directions
+    int dr[] = {-1, 1, 0, 0};
+    int dc[] = {0, 0, -1, 1};
+
+    // Explore the four neighbours
+    for (int i = 0; i < 4; i++) {
+
+        int newRow = row + dr[i];
+        int newCol = col + dc[i];
+
+        // Check grid boundaries
+        if (newRow < 0 || newRow >= ROWS ||
+            newCol < 0 || newCol >= COLS) {
+            continue;
+        }
+
+        int neighbour = indexOf(newRow, newCol);
+
+        // Skip walls and already visited cells
+        if (grid[neighbour].isWall ||
+            grid[neighbour].visited) {
+            continue; //skips the rest of the current loop iteration and moves to the next neighbour
+        }
+
+        // Mark as visited
+        grid[neighbour].visited = true;
+
+        // Remember where this cell came from
+        parent[neighbour] = current;
+
+        // Add it to the BFS queue
+        frontier.push(neighbour);
+    }
+}
+
+
+
 
 int main() {
 
@@ -181,72 +334,77 @@ int main() {
         "Pathfinding Visualiser"
     );
 
-    window.setFramerateLimit(60);
+    // Detect a new Space press
+    bool spaceWasPressed = false;
 
-    bool spaceWasPressed = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
-    if (spaceIsPressed && !spaceWasPressed) {
-    bool success = findPath();
-
-    if (success) {
-        std::cout << "Path found!" << std::endl;
-    } else {
-        std::cout << "No path found!" << std::endl;
-    }
-}
-
-    spaceWasPressed = spaceIsPressed;
-
+    // Main game loop
     while (window.isOpen()) {
 
+        // Handle events
         while (const auto event = window.pollEvent()) {
 
-    if (event->is<sf::Event::Closed>()) {
-        window.close();
-    }
+            // Close window
+            if (event->is<sf::Event::Closed>()) {
+                window.close();
+            }
 
-    if (const auto* mousePressed =
-        event->getIf<sf::Event::MouseButtonPressed>()) {
+            // Mouse click to toggle walls
+            if (const auto* mousePressed =
+                event->getIf<sf::Event::MouseButtonPressed>()) {
 
-        if (mousePressed->button == sf::Mouse::Button::Left) {
+                if (mousePressed->button == sf::Mouse::Button::Left) {
 
-            // Get mouse position
-            sf::Vector2i mousePosition = sf::Mouse::getPosition(window);
-            //convert to grid coordinates
-            int col = (mousePosition.x - OFFSET_X) / CELL_SIZE;
-            int row = (mousePosition.y - OFFSET_Y) / CELL_SIZE;
+                    sf::Vector2i mousePosition =
+                        sf::Mouse::getPosition(window);
 
-            if (row >= 0 && row < ROWS &&
-                col >= 0 && col < COLS) {
+                    int col =
+                        (mousePosition.x - OFFSET_X) / CELL_SIZE;
 
-                // Prevent walls on Start or Goal
-                if (!((row == START_ROW && col == START_COL) ||
-                    (row == GOAL_ROW && col == GOAL_COL))) {
+                    int row =
+                        (mousePosition.y - OFFSET_Y) / CELL_SIZE;
 
-                    int index = indexOf(row, col);
-                    grid[index].isWall = !grid[index].isWall; // every click switches
+                    // Check grid boundaries
+                    if (row >= 0 && row < ROWS &&
+                        col >= 0 && col < COLS) {
+
+                        // Protect Start and Goal
+                        if (!((row == START_ROW && col == START_COL) ||
+                              (row == GOAL_ROW && col == GOAL_COL))) {
+
+                            int index = indexOf(row, col);
+
+                            grid[index].isWall =
+                                !grid[index].isWall;
+                        }
+                    }
                 }
             }
         }
-        if (const auto* keyPressed =
-            event->getIf<sf::Event::KeyPressed>()) {
 
+        // Keyboard input: Space
+        bool spaceIsPressed =
+            sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space);
 
+        if (spaceIsPressed && !spaceWasPressed) {
+            startBFS();
         }
-        }
-    }
 
+        spaceWasPressed = spaceIsPressed;
+
+        // Update BFS every frame while searching
+        if (isSearching) {
+            updateBFS();
+        }
+        // Animate the shortest path
+        if (isAnimatingPath) {
+            updatePathAnimation();
+        }
+
+        // Draw updated grid
         window.clear(sf::Color(18, 22, 30));
+
         drawGrid(window);
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space)) {
 
-    bool success = findPath();
-
-    if (success) {
-        std::cout << "Path found!" << std::endl;
-    } else {
-        std::cout << "No path found!" << std::endl;
-    }
-}
         window.display();
     }
 

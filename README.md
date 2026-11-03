@@ -38,11 +38,3 @@ cmake -S . -B build
 cmake --build build
 ./build/pathfinder
 ```
-
-## Current Progress
-
-This project is currently under development. More features, including animated pathfinding and additional algorithms such as A*, are planned.
-
-## Author
-
-Frida

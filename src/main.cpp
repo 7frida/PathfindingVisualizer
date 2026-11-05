@@ -16,12 +16,12 @@ const float OFFSET_Y = 80;
 const int WINDOW_WIDTH = 900;
 const int WINDOW_HEIGHT = 680;
 
-// Start and Goal positions
-const int START_ROW = 0;
-const int START_COL = 0;
+// Custom start and Goal positions
+int startRow = 0;
+int startCol = 0;
 
-const int GOAL_ROW = ROWS - 1;
-const int GOAL_COL = COLS - 1;
+int goalRow = ROWS - 1;
+int goalCol = COLS - 1;
 
 // Cell structure
 struct Cell {
@@ -51,6 +51,11 @@ bool pathFound = false;
 
 int pathIndex = 0;
 
+// placement mode variable for custom start & goal
+// when true - next click moves start/goal
+bool placingStart = false;
+bool placingGoal = false;
+
 // Draw the grid
 void drawGrid(sf::RenderWindow& window) {
 
@@ -69,12 +74,12 @@ void drawGrid(sf::RenderWindow& window) {
             ));
 
             // Start cell
-            if (row == START_ROW && col == START_COL) {
+            if (row == startRow && col == startCol) {
                 cell.setFillColor(sf::Color(50, 200, 100));
             }
 
             // Goal cell
-            else if (row == GOAL_ROW && col == GOAL_COL) {
+            else if (row == goalRow && col == goalCol) {
                 cell.setFillColor(sf::Color(230, 70, 70));
             }
 
@@ -115,8 +120,8 @@ bool findPath() {
     std::vector<int> parent(ROWS * COLS, -1);
     std::queue<int> frontier;
 
-    int start = indexOf(START_ROW, START_COL);
-    int goal = indexOf(GOAL_ROW, GOAL_COL);
+    int start = indexOf(startRow, startCol);
+    int goal = indexOf(goalRow, goalCol);
 
     grid[start].visited = true;
     frontier.push(start);
@@ -181,8 +186,8 @@ bool findPath() {
 
 void reconstructPath() {
 
-    int start = indexOf(START_ROW, START_COL);
-    int goal = indexOf(GOAL_ROW, GOAL_COL);
+    int start = indexOf(startRow, startCol);
+    int goal = indexOf(goalRow, goalCol);
 
     // Start from the Goal
     int current = goal;
@@ -245,7 +250,7 @@ void startBFS() {
     pathIndex = 0;
 
     // Initialise Start cell
-    int start = indexOf(START_ROW, START_COL);
+    int start = indexOf(startRow, startCol);
     grid[start].visited = true;
 
     frontier.push(start);
@@ -272,7 +277,7 @@ void updateBFS() {
     frontier.pop();
 
     // Check whether we have reached the Goal
-    int goal = indexOf(GOAL_ROW, GOAL_COL);
+    int goal = indexOf(goalRow, goalCol);
 
     if (current == goal) {
 
@@ -348,6 +353,21 @@ int main() {
                 window.close();
             }
 
+            // custom start & end
+            if (const auto* key = event->getIf<sf::Event::KeyPressed>()) {
+                if (key->code == sf::Keyboard::Key::S) {
+                    placingStart = true;
+                    placingGoal = false;
+                    std::cout << "Select a new Start cell." << std::endl;
+                }
+
+                else if (key->code == sf::Keyboard::Key::G) {
+                    placingGoal = true;
+                    placingStart = false;
+                    std::cout << "Select a new Goal cell." << std::endl;
+                }
+            }
+
             // Mouse click to toggle walls
             if (const auto* mousePressed =
                 event->getIf<sf::Event::MouseButtonPressed>()) {
@@ -368,13 +388,42 @@ int main() {
                         col >= 0 && col < COLS) {
 
                         // Protect Start and Goal
-                        if (!((row == START_ROW && col == START_COL) ||
-                              (row == GOAL_ROW && col == GOAL_COL))) {
+                        if (!((row == startRow && col == startCol) ||
+                              (row == goalRow && col == goalCol))) {
 
                             int index = indexOf(row, col);
+                    //toogle three actions
+                    if (placingStart) {
 
-                            grid[index].isWall =
-                                !grid[index].isWall;
+                        if (row != goalRow || col != goalCol) {
+                            startRow = row;
+                            startCol = col;
+                            grid[index].isWall = false;
+                        }
+
+                        placingStart = false;
+
+                    }
+                    else if (placingGoal) {
+
+                        if (row != startRow || col != startCol) {
+                            goalRow = row;
+                            goalCol = col;
+                            grid[index].isWall = false;
+                        }
+
+                        placingGoal = false;
+
+                    }
+                    else {
+
+                        if (row != startRow || col != startCol) {
+                            if (row != goalRow || col != goalCol) {
+                                grid[index].isWall = !grid[index].isWall;
+                            }
+                        }
+
+                    }
                         }
                     }
                 }

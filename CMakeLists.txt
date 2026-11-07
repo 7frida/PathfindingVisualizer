@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.20)
 
 project(PathfindingVisualizer)
@@ -5,16 +6,15 @@ project(PathfindingVisualizer)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(SFML 3 COMPONENTS
-    Graphics
-    Window
-    System
-    REQUIRED
-)
+find_package(SFML 3 COMPONENTS Graphics Window System REQUIRED)
 
 add_executable(pathfinder
     src/main.cpp
+    src/Grid.cpp
+    src/BFS.cpp
 )
+
+target_include_directories(pathfinder PRIVATE include)
 
 target_link_libraries(pathfinder PRIVATE
     SFML::Graphics

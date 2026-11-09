@@ -12,7 +12,9 @@ add_executable(pathfinder
     src/main.cpp
     src/Grid.cpp
     src/BFS.cpp
+    src/Dijkstra.cpp
 )
+
 
 target_include_directories(pathfinder PRIVATE include)
 

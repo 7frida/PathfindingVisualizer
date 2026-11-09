@@ -4,6 +4,7 @@
 
 #include "Grid.hpp"
 #include "BFS.hpp"
+#include "Dijkstra.hpp"
 
 int main() {
 
@@ -17,6 +18,7 @@ int main() {
 
     // Main game loop
     while (window.isOpen()) {
+        int selectedAlgorithm = 1; // 1for BFS, 2 for Dijkstra
 
         // Handle events
         while (const auto event = window.pollEvent()) {
@@ -44,6 +46,14 @@ int main() {
 
                     std::cout << "Select a new Goal cell."
                               << std::endl;
+                }
+                else if (key->code == sf::Keyboard::Key::Num1) {
+                    selectedAlgorithm = 1;
+                    std::cout << "Selected: BFS" << std::endl;
+                }
+                else if (key->code == sf::Keyboard::Key::Num2) {
+                    selectedAlgorithm = 2;
+                    std::cout << "Selected: Dijkstra" << std::endl;
                 }
             }
 
@@ -114,7 +124,12 @@ int main() {
             );
 
         if (spaceIsPressed && !spaceWasPressed) {
-            startBFS();
+            if (selectedAlgorithm == 1) {
+                startBFS();
+            }
+            else if (selectedAlgorithm == 2) {
+                startDijkstra();
+            }
         }
 
         spaceWasPressed = spaceIsPressed;
@@ -128,6 +143,12 @@ int main() {
         if (isAnimatingPath) {
             updatePathAnimation();
         }
+        // Dijkstra
+        if (isDijkstraSearching){
+            updateDijkstra();}
+
+        if (isDijkstraAnimatingPath){
+            updateDijkstraPathAnimation();}
 
         // Draw grid
         window.clear(sf::Color(18, 22, 30));
